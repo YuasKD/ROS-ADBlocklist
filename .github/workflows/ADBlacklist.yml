@@ -26,14 +26,14 @@ jobs:
         echo "/ip dns static" > $OUT_FILE
         echo ":log info \"Starting GitHub Release Import...\"" >> $OUT_FILE
         # 清理旧规则 (Comment 必须与生成的一致)
-        echo "remove [find comment=\"GitHub-Release-AdBlock\"]" >> $OUT_FILE
+        echo "remove [find comment=\"AdBlock\"]" >> $OUT_FILE
         
         # 2. 下载并转换
         # Yoyo list -> Filter 127.0.0.1 -> Remove CR -> Format
         curl -s "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext" | \
         grep "127.0.0.1" | \
         sed 's/\r//' | \
-        awk '{print "add address=127.0.0.1 name=\"" $2 "\" comment=\"GitHub-Release-AdBlock\""}' >> $OUT_FILE
+        awk '{print "add address=127.0.0.1 name=\"" $2 "\" comment=\"AdBlock\""}' >> $OUT_FILE
         
         echo ":log info \"GitHub Release Import Completed.\"" >> $OUT_FILE
 
