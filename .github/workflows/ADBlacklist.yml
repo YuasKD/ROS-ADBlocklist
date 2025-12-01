@@ -20,22 +20,40 @@ jobs:
 
     - name: Generate RSC File
       run: |
-        OUT_FILE="yoyo_adblock.rsc"
+        # 定义文件名
+        OUT_FILE="ros_adblock.rsc"
+        TEMP_DOMAINS="domains.tmp"
         
-        # 1. 写入头部
-        echo "/ip dns static" > $OUT_FILE
-        echo ":log info \"Starting GitHub Release Import...\"" >> $OUT_FILE
-        # 清理旧规则 (Comment 必须与生成的一致)
-        echo "remove [find comment=\"AdBlock\"]" >> $OUT_FILE
-        
-        # 2. 下载并转换
-        # Yoyo list -> Filter 127.0.0.1 -> Remove CR -> Format
+        # 1. 下载 Yoyo List (Hosts 格式)
+        # 逻辑：筛选 127.0.0.1 -> 打印第二列(域名) -> 去除回车符
+        echo "Downloading Yoyo list..."
         curl -s "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext" | \
-        grep "127.0.0.1" | \
-        sed 's/\r//' | \
-        awk '{print "add address=127.0.0.1 name=\"" $2 "\" comment=\"AdBlock\""}' >> $OUT_FILE
+        grep "127.0.0.1" | awk '{print $2}' | sed 's/\r//' >> $TEMP_DOMAINS
+
+        # 2. 下载 Uniartisan List (Adblock Plus 格式)
+        # 逻辑：筛选以 || 开头的行 -> 截取 || 和 ^ 之间的内容(域名) -> 去除空行
+        echo "Downloading Uniartisan list..."
+        curl -s "https://raw.githubusercontent.com/uniartisan/adblock_list/master/adblock_plus.txt" | \
+        grep "^||" | \
+        cut -d'^' -f1 | \
+        sed 's/^||//' | sed 's/\r//' >> $TEMP_DOMAINS
+
+        # 3. 生成 RSC 文件头
+        echo "/ip dns static" > $OUT_FILE
+        echo ":log info \"Starting Mixed AdBlock Import...\"" >> $OUT_FILE
+        # 注意：这里我们使用统一的 Comment，方便脚本管理
+        echo "remove [find comment=\"GitHub-Release-AdBlock\"]" >> $OUT_FILE
         
-        echo ":log info \"GitHub Release Import Completed.\"" >> $OUT_FILE
+        # 4. 合并、去重、格式化输出
+        # 逻辑：转小写(防大小写重复) -> 排序 -> 去重 -> awk 拼接 RouterOS 命令
+        echo "Processing domains..."
+        tr 'A-Z' 'a-z' < $TEMP_DOMAINS | sort | uniq | \
+        awk '{if(length($1)>0) print "add address=127.0.0.1 name=\"" $1 "\" comment=\"GitHub-Release-AdBlock\""}' >> $OUT_FILE
+        
+        echo ":log info \"Mixed AdBlock Import Completed.\"" >> $OUT_FILE
+        
+        # 清理临时文件
+        rm $TEMP_DOMAINS
 
     - name: Commit and Push changes
       run: |
