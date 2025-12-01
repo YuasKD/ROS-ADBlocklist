@@ -42,13 +42,13 @@ jobs:
         echo "/ip dns static" > $OUT_FILE
         echo ":log info \"Starting Mixed AdBlock Import...\"" >> $OUT_FILE
         # 注意：这里我们使用统一的 Comment，方便脚本管理
-        echo "remove [find comment=\"GitHub-Release-AdBlock\"]" >> $OUT_FILE
+        echo "remove [find comment=\"AdBlock\"]" >> $OUT_FILE
         
         # 4. 合并、去重、格式化输出
         # 逻辑：转小写(防大小写重复) -> 排序 -> 去重 -> awk 拼接 RouterOS 命令
         echo "Processing domains..."
         tr 'A-Z' 'a-z' < $TEMP_DOMAINS | sort | uniq | \
-        awk '{if(length($1)>0) print "add address=127.0.0.1 name=\"" $1 "\" comment=\"GitHub-Release-AdBlock\""}' >> $OUT_FILE
+        awk '{if(length($1)>0) print "add address=127.0.0.1 name=\"" $1 "\" comment=\"AdBlock\""}' >> $OUT_FILE
         
         echo ":log info \"Mixed AdBlock Import Completed.\"" >> $OUT_FILE
         
