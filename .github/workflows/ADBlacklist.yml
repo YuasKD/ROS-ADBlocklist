@@ -1,0 +1,64 @@
+name: Publish Adblock List to Release
+
+on:
+  schedule:
+    # 每天北京时间凌晨 4:00 (UTC 20:00)
+    - cron: '0 20 * * *'
+  workflow_dispatch: # 允许手动触发
+
+# 必须赋予写权限才能创建 Release
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Generate RSC File
+      run: |
+        OUT_FILE="yoyo_adblock.rsc"
+        
+        # 1. 写入头部
+        echo "/ip dns static" > $OUT_FILE
+        echo ":log info \"Starting GitHub Release Import...\"" >> $OUT_FILE
+        # 清理旧规则 (Comment 必须与生成的一致)
+        echo "remove [find comment=\"GitHub-Release-AdBlock\"]" >> $OUT_FILE
+        
+        # 2. 下载并转换
+        # Yoyo list -> Filter 127.0.0.1 -> Remove CR -> Format
+        curl -s "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext" | \
+        grep "127.0.0.1" | \
+        sed 's/\r//' | \
+        awk '{print "add address=127.0.0.1 name=\"" $2 "\" comment=\"GitHub-Release-AdBlock\""}' >> $OUT_FILE
+        
+        echo ":log info \"GitHub Release Import Completed.\"" >> $OUT_FILE
+
+    - name: Commit and Push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add yoyo_adblock.rsc
+        # 只有当文件发生变化时才提交
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update adblock list $(date +'%Y-%m-%d')" && git push)
+    
+    - name: Update Release Tag
+      # 强制更新 'rolling' 标签到最新 commit，实现“滚动发布”
+      run: |
+        git config --global user.email "action@github.com"
+        git config --global user.name "GitHub Action"
+        git tag -fa rolling -m "Daily Adblock Update"
+        git push origin rolling --force
+
+    - name: Publish Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: rolling
+        files: yoyo_adblock.rsc
+        name: Daily Adblock Rules
+        body: "Auto-generated adblock list for MikroTik RB5009.\nUpdate time: $(date)"
+        draft: false
+        prerelease: false
